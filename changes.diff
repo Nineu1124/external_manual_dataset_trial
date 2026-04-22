@@ -1,0 +1,78 @@
+﻿diff --git a/init/gson/src/main/java/com/google/gson/TypeAdapter.java b/final/gson/src/main/java/com/google/gson/TypeAdapter.java
+index e33a839..3555ea6 100644
+--- a/init/gson/src/main/java/com/google/gson/TypeAdapter.java
++++ b/final/gson/src/main/java/com/google/gson/TypeAdapter.java
+@@ -319,4 +319,35 @@ public abstract class TypeAdapter<T> {
+       return "NullSafeTypeAdapter[" + TypeAdapter.this + "]";
+     }
+   }
++
++  /**
++   * Returns a type adapter that only supports reading. The returned adapter's {@link
++   * #write(JsonWriter, Object)} method throws {@link UnsupportedOperationException}. This is useful
++   * when a type should only be deserialized but not serialized.
++   *
++   * <p>Calling this method on an adapter which is already read-only returns the same instance.
++   */
++  public final TypeAdapter<T> readOnly() {
++    if (!(this instanceof TypeAdapter.ReadOnlyTypeAdapter)) {
++      return new ReadOnlyTypeAdapter();
++    }
++    return this;
++  }
++
++  private final class ReadOnlyTypeAdapter extends TypeAdapter<T> {
++    @Override
++    public void write(JsonWriter out, T value) {
++      throw new UnsupportedOperationException("Cannot write with a read-only type adapter");
++    }
++
++    @Override
++    public T read(JsonReader reader) throws IOException {
++      return TypeAdapter.this.read(reader);
++    }
++
++    @Override
++    public String toString() {
++      return "ReadOnlyTypeAdapter[" + TypeAdapter.this + "]";
++    }
++  }
+ }
+diff --git a/init/gson/src/test/java/com/google/gson/TypeAdapterTest.java b/final/gson/src/test/java/com/google/gson/TypeAdapterTest.java
+index 8f4806f..ef684d0 100644
+--- a/init/gson/src/test/java/com/google/gson/TypeAdapterTest.java
++++ b/final/gson/src/test/java/com/google/gson/TypeAdapterTest.java
+@@ -125,4 +125,33 @@ public class TypeAdapterTest {
+   public void testFromJson_String_TrailingData() throws IOException {
+     assertThat(adapter.fromJson("\"a\"1")).isEqualTo("a");
+   }
++
++  @Test
++  public void testReadOnly() throws IOException {
++    TypeAdapter<String> readOnlyAdapter = adapter.readOnly();
++
++    // read should delegate normally
++    assertThat(readOnlyAdapter.fromJson("\"a\"")).isEqualTo("a");
++    // write should throw UnsupportedOperationException
++    assertThrows(UnsupportedOperationException.class, () -> readOnlyAdapter.toJson("a"));
++  }
++
++  @Test
++  public void testReadOnly_ReturningSameInstanceOnceReadOnly() {
++    TypeAdapter<?> readOnlyAdapter = assertionErrorAdapter.readOnly();
++
++    assertThat(readOnlyAdapter.readOnly()).isSameInstanceAs(readOnlyAdapter);
++    assertThat(readOnlyAdapter.readOnly().readOnly()).isSameInstanceAs(readOnlyAdapter);
++    assertThat(readOnlyAdapter.readOnly().readOnly().readOnly()).isSameInstanceAs(readOnlyAdapter);
++  }
++
++  @Test
++  public void testReadOnly_ToString() {
++    TypeAdapter<?> a = assertionErrorAdapter;
++
++    assertThat(a.toString()).isEqualTo("assertionErrorAdapter");
++    assertThat(a.readOnly().toString()).isEqualTo("ReadOnlyTypeAdapter[assertionErrorAdapter]");
++    assertThat(a.readOnly().readOnly().toString())
++        .isEqualTo("ReadOnlyTypeAdapter[assertionErrorAdapter]");
++  }
+ }
