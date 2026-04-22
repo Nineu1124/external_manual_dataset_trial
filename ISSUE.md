@@ -53,7 +53,7 @@ private final class NullSafeTypeAdapter extends TypeAdapter<T> {
 
 | 验收编号 | 辅助 verifier | 评测动作（运行什么） | 检查位置（检查哪里） | 通过标准（应得到什么） | 常见失败表现 |
 |----------|---------------|----------------------|----------------------|------------------------|--------------|
-| A1 | F1 | 在 workspace/gson 中运行 `mvn test -pl gson -Dtest=TypeAdapterTest` | 终端输出 | 测试全部通过（0 Failures, 0 Errors） | 测试失败或有编译错误 |
+| A1 | F1 | 在 workspace/gson 中运行 `mvn test -Dtest=TypeAdapterTest` | 终端输出 | 测试全部通过（0 Failures, 0 Errors） | 测试失败或有编译错误 |
 | A2 | F2 | 在 TypeAdapter.java 中搜索 `readOnly` 方法 | 源码 | 存在 `public final TypeAdapter<T> readOnly()` 方法声明 | 方法不存在 |
 | A3 | F3 | 在 TypeAdapterTest.java 中搜索 `testReadOnly` | 测试源码 | 存在 `testReadOnly` 相关测试方法 | 测试方法不存在 |
 | A4 | F1 | 构造一个 TypeAdapter 并调用 `.readOnly()`，然后调用 `write()` 方向方法 | 程序行为 | `write()` 方向抛出 `UnsupportedOperationException` | 未抛异常或抛其他类型异常 |
@@ -110,15 +110,15 @@ bash $ISSUE_ROOT/reproduce.sh
 conda activate gson-type-adapter-helpers
 cd $ISSUE_ROOT/workspace/gson
 # 验证 TypeAdapter 中没有 readOnly 方法
-grep -n "readOnly" gson/src/main/java/com/google/gson/TypeAdapter.java && echo "FAIL: readOnly exists" || echo "PASS: readOnly does not exist in init"
+grep -n "readOnly" src/main/java/com/google/gson/TypeAdapter.java && echo "FAIL: readOnly exists" || echo "PASS: readOnly does not exist in init"
 # 验证 TypeAdapterTest 中没有 testReadOnly 测试
-grep -n "testReadOnly" gson/src/test/java/com/google/gson/TypeAdapterTest.java && echo "FAIL: testReadOnly exists" || echo "PASS: testReadOnly does not exist in init"
+grep -n "testReadOnly" src/test/java/com/google/gson/TypeAdapterTest.java && echo "FAIL: testReadOnly exists" || echo "PASS: testReadOnly does not exist in init"
 ```
 
 ### 第三步：验证初始现象
 - TypeAdapter.java 中不存在 `readOnly()` 方法
 - TypeAdapterTest.java 中不存在 `testReadOnly` 测试
-- 构建应正常通过：`mvn compile -pl gson -q`
+- 构建应正常通过：`mvn compile -q`
 
 ### 第四步：验证改动后效果
 将 final 中的改动文件复制到 workspace：
@@ -129,9 +129,9 @@ cp $ISSUE_ROOT/final/gson/src/test/java/com/google/gson/TypeAdapterTest.java $IS
 
 按验收编号逐条检查：
 
-- **A1**：运行 `mvn test -pl gson -Dtest=TypeAdapterTest -Dsurefire.useFile=false` → 测试全部通过（0 Failures, 0 Errors）
-- **A2**：`grep -n "readOnly" gson/src/main/java/com/google/gson/TypeAdapter.java` → 找到 `public final TypeAdapter<T> readOnly()` 方法声明
-- **A3**：`grep -n "testReadOnly" gson/src/test/java/com/google/gson/TypeAdapterTest.java` → 找到 3 个测试方法
+- **A1**：运行 `mvn test -Dtest=TypeAdapterTest -Dsurefire.useFile=false` → 测试全部通过（0 Failures, 0 Errors）
+- **A2**：`grep -n "readOnly" src/main/java/com/google/gson/TypeAdapter.java` → 找到 `public final TypeAdapter<T> readOnly()` 方法声明
+- **A3**：`grep -n "testReadOnly" src/test/java/com/google/gson/TypeAdapterTest.java` → 找到 3 个测试方法
 - **A4**：readOnly() 包装后 write 方向抛 UnsupportedOperationException（由 testReadOnly 测试覆盖）
 - **A5**：readOnly() 包装后 read 方向正常委托（由 testReadOnly 测试覆盖）
 
