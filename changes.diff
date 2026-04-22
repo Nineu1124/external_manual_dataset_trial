@@ -1,0 +1,1066 @@
+diff --git a/gson/src/main/java/com/google/gson/DiffEntry.java b/gson/src/main/java/com/google/gson/DiffEntry.java
+new file mode 100644
+index 00000000..fddc4ce2
+--- /dev/null
++++ b/gson/src/main/java/com/google/gson/DiffEntry.java
+@@ -0,0 +1,112 @@
++/*
++ * Copyright (C) 2025 Google Inc.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package com.google.gson;
++
++import java.util.Objects;
++
++/**
++ * Represents a single difference between two {@link JsonElement} values at a specific path.
++ *
++ * <p>Each entry captures:
++ *
++ * <ul>
++ *   <li>The {@linkplain #getPath() path} where the difference was found (e.g., {@code "$.a.b[0]"})
++ *   <li>The {@linkplain #getOperation() type} of difference ({@link DiffOperation#ADD}, {@link
++ *       DiffOperation#REMOVE}, or {@link DiffOperation#CHANGE})
++ *   <li>The {@linkplain #getOldValue() old value} from the left element (may be {@code null} for
++ *       {@code ADD})
++ *   <li>The {@linkplain #getNewValue() new value} from the right element (may be {@code null} for
++ *       {@code REMOVE})
++ * </ul>
++ *
++ * <p>Note: {@code oldValue} and {@code newValue} are deep copies of the original {@code
++ * JsonElement} values, ensuring that the diff result is a stable snapshot independent of subsequent
++ * mutations to the compared elements.
++ *
++ * @see JsonDiff
++ * @see JsonDiffResult
++ * @since 2.12.2
++ */
++public final class DiffEntry {
++  private final String path;
++  private final DiffOperation operation;
++  private final JsonElement oldValue;
++  private final JsonElement newValue;
++
++  DiffEntry(String path, DiffOperation operation, JsonElement oldValue, JsonElement newValue) {
++    this.path = Objects.requireNonNull(path);
++    this.operation = Objects.requireNonNull(operation);
++    this.oldValue = oldValue;
++    this.newValue = newValue;
++  }
++
++  /**
++   * Returns the JSON path where the difference was found. The root element has path {@code "$"}.
++   * Object members use dot notation (e.g., {@code "$.a.b"}) and array elements use bracket notation
++   * (e.g., {@code "$.a[0]"}).
++   */
++  public String getPath() {
++    return path;
++  }
++
++  /** Returns the type of difference. */
++  public DiffOperation getOperation() {
++    return operation;
++  }
++
++  /**
++   * Returns the value from the left {@link JsonElement} at this path.
++   *
++   * <p>Returns {@code null} when {@link #getOperation()} is {@link DiffOperation#ADD} (the path
++   * does not exist in the left element). For {@link DiffOperation#REMOVE} and {@link
++   * DiffOperation#CHANGE}, this returns a deep copy of the value from the left element.
++   *
++   * <p>Note: A {@code null} return value means the path does not exist on that side. This is
++   * distinct from {@link JsonNull#INSTANCE}, which means the path exists but the value is JSON
++   * {@code null}.
++   */
++  public JsonElement getOldValue() {
++    return oldValue;
++  }
++
++  /**
++   * Returns the value from the right {@link JsonElement} at this path.
++   *
++   * <p>Returns {@code null} when {@link #getOperation()} is {@link DiffOperation#REMOVE} (the path
++   * does not exist in the right element). For {@link DiffOperation#ADD} and {@link
++   * DiffOperation#CHANGE}, this returns a deep copy of the value from the right element.
++   *
++   * <p>Note: A {@code null} return value means the path does not exist on that side. This is
++   * distinct from {@link JsonNull#INSTANCE}, which means the path exists but the value is JSON
++   * {@code null}.
++   */
++  public JsonElement getNewValue() {
++    return newValue;
++  }
++
++  @Override
++  public String toString() {
++    StringBuilder sb = new StringBuilder();
++    sb.append(path).append(": ").append(operation);
++    if (oldValue != null) {
++      sb.append(", old=").append(oldValue);
++    }
++    if (newValue != null) {
++      sb.append(", new=").append(newValue);
++    }
++    return sb.toString();
++  }
++}
+diff --git a/gson/src/main/java/com/google/gson/DiffOperation.java b/gson/src/main/java/com/google/gson/DiffOperation.java
+new file mode 100644
+index 00000000..16598d58
+--- /dev/null
++++ b/gson/src/main/java/com/google/gson/DiffOperation.java
+@@ -0,0 +1,49 @@
++/*
++ * Copyright (C) 2025 Google Inc.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package com.google.gson;
++
++/**
++ * Represents the type of difference between two {@link JsonElement} values.
++ *
++ * @see DiffEntry
++ * @see JsonDiff
++ * @since 2.12.2
++ */
++public enum DiffOperation {
++  /**
++   * A path exists in the right {@link JsonElement} but not in the left.
++   *
++   * <p>For this operation, {@link DiffEntry#getOldValue()} returns {@code null} and {@link
++   * DiffEntry#getNewValue()} returns the value from the right element.
++   */
++  ADD,
++
++  /**
++   * A path exists in the left {@link JsonElement} but not in the right.
++   *
++   * <p>For this operation, {@link DiffEntry#getOldValue()} returns the value from the left element
++   * and {@link DiffEntry#getNewValue()} returns {@code null}.
++   */
++  REMOVE,
++
++  /**
++   * A path exists in both {@link JsonElement} values but the values differ.
++   *
++   * <p>For this operation, {@link DiffEntry#getOldValue()} returns the value from the left element
++   * and {@link DiffEntry#getNewValue()} returns the value from the right element.
++   */
++  CHANGE
++}
+diff --git a/gson/src/main/java/com/google/gson/JsonDiff.java b/gson/src/main/java/com/google/gson/JsonDiff.java
+new file mode 100644
+index 00000000..6293b978
+--- /dev/null
++++ b/gson/src/main/java/com/google/gson/JsonDiff.java
+@@ -0,0 +1,175 @@
++/*
++ * Copyright (C) 2025 Google Inc.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package com.google.gson;
++
++import java.util.ArrayList;
++import java.util.List;
++import java.util.Objects;
++import java.util.Set;
++
++/**
++ * Compares two {@link JsonElement} values and produces a structured diff result.
++ *
++ * <p>The comparison follows the same semantics as {@link JsonElement#equals(Object)}:
++ *
++ * <ul>
++ *   <li>{@link JsonObject} members are compared by name, ignoring insertion order
++ *   <li>{@link JsonArray} elements are compared by index, order-sensitive
++ *   <li>{@link JsonPrimitive} values are compared using {@link JsonPrimitive#equals(Object)}
++ *   <li>{@link JsonNull} instances are always equal
++ * </ul>
++ *
++ * <p>When two elements are equal according to these rules, the diff result is empty. When they
++ * differ, the result contains {@link DiffEntry} instances with JSON paths describing each
++ * difference.
++ *
++ * <p>Example usage:
++ *
++ * <pre>{@code
++ * JsonObject left = new JsonObject();
++ * left.addProperty("name", "Alice");
++ * left.addProperty("age", 30);
++ *
++ * JsonObject right = new JsonObject();
++ * right.addProperty("name", "Bob");
++ * right.addProperty("age", 30);
++ * right.addProperty("email", "bob@example.com");
++ *
++ * JsonDiffResult result = JsonDiff.diff(left, right);
++ * // result contains:
++ * //   $.name: CHANGE (old="Alice", new="Bob")
++ * //   $.email: ADD (new="bob@example.com")
++ * }</pre>
++ *
++ * @see JsonDiffResult
++ * @see DiffEntry
++ * @see DiffOperation
++ * @since 2.12.2
++ */
++public final class JsonDiff {
++
++  private JsonDiff() {} // Pure static utility class
++
++  /**
++   * Compares two {@link JsonElement} values and returns the differences.
++   *
++   * @param left the base {@link JsonElement}, must not be {@code null}
++   * @param right the {@link JsonElement} to compare against, must not be {@code null}
++   * @return a {@link JsonDiffResult} describing all differences; empty if the elements are equal
++   * @throws NullPointerException if left or right is null
++   */
++  public static JsonDiffResult diff(JsonElement left, JsonElement right) {
++    Objects.requireNonNull(left, "left must not be null");
++    Objects.requireNonNull(right, "right must not be null");
++    List<DiffEntry> differences = new ArrayList<>();
++    collectDifferences(left, right, "$", differences);
++    return new JsonDiffResult(differences);
++  }
++
++  private static void collectDifferences(
++      JsonElement left, JsonElement right, String path, List<DiffEntry> differences) {
++    // Short-circuit: if equal, no differences
++    if (left.equals(right)) {
++      return;
++    }
++
++    // Both are JsonObject -> compare members by name
++    if (left.isJsonObject() && right.isJsonObject()) {
++      diffObjects(left.getAsJsonObject(), right.getAsJsonObject(), path, differences);
++      return;
++    }
++
++    // Both are JsonArray -> compare elements by index
++    if (left.isJsonArray() && right.isJsonArray()) {
++      diffArrays(left.getAsJsonArray(), right.getAsJsonArray(), path, differences);
++      return;
++    }
++
++    // All other cases (type mismatch, or primitive values that differ)
++    differences.add(
++        new DiffEntry(path, DiffOperation.CHANGE, left.deepCopy(), right.deepCopy()));
++  }
++
++  private static void diffObjects(
++      JsonObject left, JsonObject right, String path, List<DiffEntry> differences) {
++    Set<String> leftKeys = left.keySet();
++    Set<String> rightKeys = right.keySet();
++
++    // Members only in left -> REMOVE
++    for (String key : leftKeys) {
++      if (!rightKeys.contains(key)) {
++        differences.add(
++            new DiffEntry(
++                memberPath(path, key),
++                DiffOperation.REMOVE,
++                left.get(key).deepCopy(),
++                null));
++      }
++    }
++
++    // Members only in right -> ADD
++    for (String key : rightKeys) {
++      if (!leftKeys.contains(key)) {
++        differences.add(
++            new DiffEntry(
++                memberPath(path, key),
++                DiffOperation.ADD,
++                null,
++                right.get(key).deepCopy()));
++      }
++    }
++
++    // Members in both -> recurse
++    for (String key : leftKeys) {
++      if (rightKeys.contains(key)) {
++        collectDifferences(
++            left.get(key), right.get(key), memberPath(path, key), differences);
++      }
++    }
++  }
++
++  private static void diffArrays(
++      JsonArray left, JsonArray right, String path, List<DiffEntry> differences) {
++    int minSize = Math.min(left.size(), right.size());
++
++    // Compare elements at common indices
++    for (int i = 0; i < minSize; i++) {
++      collectDifferences(left.get(i), right.get(i), elementPath(path, i), differences);
++    }
++
++    // Extra elements in right -> ADD
++    for (int i = minSize; i < right.size(); i++) {
++      differences.add(
++          new DiffEntry(
++              elementPath(path, i), DiffOperation.ADD, null, right.get(i).deepCopy()));
++    }
++
++    // Extra elements in left -> REMOVE
++    for (int i = minSize; i < left.size(); i++) {
++      differences.add(
++          new DiffEntry(
++              elementPath(path, i), DiffOperation.REMOVE, left.get(i).deepCopy(), null));
++    }
++  }
++
++  private static String memberPath(String parent, String memberName) {
++    return parent + "." + memberName;
++  }
++
++  private static String elementPath(String parent, int index) {
++    return parent + "[" + index + "]";
++  }
++}
+diff --git a/gson/src/main/java/com/google/gson/JsonDiffResult.java b/gson/src/main/java/com/google/gson/JsonDiffResult.java
+new file mode 100644
+index 00000000..7005ef58
+--- /dev/null
++++ b/gson/src/main/java/com/google/gson/JsonDiffResult.java
+@@ -0,0 +1,62 @@
++/*
++ * Copyright (C) 2025 Google Inc.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package com.google.gson;
++
++import java.util.Collections;
++import java.util.List;
++import java.util.Objects;
++
++/**
++ * The result of comparing two {@link JsonElement} values using {@link JsonDiff#diff}.
++ *
++ * <p>The result contains a list of {@link DiffEntry} instances, each describing a single
++ * difference. If the list is empty, the two elements are considered equal according to the same
++ * rules as {@link JsonElement#equals(Object)}.
++ *
++ * @see JsonDiff
++ * @see DiffEntry
++ * @since 2.12.2
++ */
++public final class JsonDiffResult {
++  private final List<DiffEntry> differences;
++
++  JsonDiffResult(List<DiffEntry> differences) {
++    this.differences = Objects.requireNonNull(differences);
++  }
++
++  /**
++   * Returns {@code true} if no differences were found, meaning the two {@link JsonElement} values
++   * are equal.
++   */
++  public boolean isEmpty() {
++    return differences.isEmpty();
++  }
++
++  /** Returns the number of differences found. */
++  public int size() {
++    return differences.size();
++  }
++
++  /**
++   * Returns an unmodifiable list of {@link DiffEntry} instances describing each difference.
++   *
++   * <p>The entries are ordered by discovery order during the depth-first traversal of the JSON
++   * tree.
++   */
++  public List<DiffEntry> getDifferences() {
++    return Collections.unmodifiableList(differences);
++  }
++}
+diff --git a/gson/src/test/java/com/google/gson/JsonArrayTest.java b/gson/src/test/java/com/google/gson/JsonArrayTest.java
+index e6e60070..faa06cf4 100644
+--- a/gson/src/test/java/com/google/gson/JsonArrayTest.java
++++ b/gson/src/test/java/com/google/gson/JsonArrayTest.java
+@@ -59,6 +59,28 @@ public final class JsonArrayTest {
+     assertThat(b.equals(a)).isFalse();
+   }
+ 
++  @Test
++  public void testDiffOnEqualArrays() {
++    JsonArray a = new JsonArray();
++    JsonArray b = new JsonArray();
++    a.add("hello");
++    b.add("hello");
++    MoreAsserts.assertNoDifferences(a, b);
++  }
++
++  @Test
++  public void testDiffOnDifferentArrays() {
++    JsonArray a = new JsonArray();
++    a.add(new JsonObject());
++    JsonArray b = new JsonArray();
++
++    JsonDiffResult result = JsonDiff.diff(a, b);
++    assertThat(result.isEmpty()).isFalse();
++    assertThat(result.getDifferences()).hasSize(1);
++    assertThat(result.getDifferences().get(0).getOperation()).isEqualTo(DiffOperation.REMOVE);
++    assertThat(result.getDifferences().get(0).getPath()).isEqualTo("$[0]");
++  }
++
+   @Test
+   public void testRemove() {
+     JsonArray array = new JsonArray();
+diff --git a/gson/src/test/java/com/google/gson/JsonDiffTest.java b/gson/src/test/java/com/google/gson/JsonDiffTest.java
+new file mode 100644
+index 00000000..1b0670b0
+--- /dev/null
++++ b/gson/src/test/java/com/google/gson/JsonDiffTest.java
+@@ -0,0 +1,525 @@
++/*
++ * Copyright (C) 2025 Google Inc.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package com.google.gson;
++
++import static com.google.common.truth.Truth.assertThat;
++import static org.junit.Assert.assertThrows;
++
++import java.util.List;
++import org.junit.Test;
++
++/** Tests for {@link JsonDiff}, {@link JsonDiffResult}, {@link DiffEntry}, and {@link DiffOperation}. */
++public class JsonDiffTest {
++
++  // ---- Null argument handling ----
++
++  @Test
++  public void testDiffNullLeft() {
++    NullPointerException e =
++        assertThrows(
++            NullPointerException.class, () -> JsonDiff.diff(null, JsonNull.INSTANCE));
++    assertThat(e).hasMessageThat().isEqualTo("left must not be null");
++  }
++
++  @Test
++  public void testDiffNullRight() {
++    NullPointerException e =
++        assertThrows(
++            NullPointerException.class, () -> JsonDiff.diff(JsonNull.INSTANCE, null));
++    assertThat(e).hasMessageThat().isEqualTo("right must not be null");
++  }
++
++  // ---- Identical elements -> no differences ----
++
++  @Test
++  public void testDiffIdenticalPrimitives() {
++    JsonDiffResult result = JsonDiff.diff(new JsonPrimitive(42), new JsonPrimitive(42));
++    assertThat(result.isEmpty()).isTrue();
++    assertThat(result.size()).isEqualTo(0);
++  }
++
++  @Test
++  public void testDiffIdenticalStrings() {
++    JsonDiffResult result =
++        JsonDiff.diff(new JsonPrimitive("hello"), new JsonPrimitive("hello"));
++    assertThat(result.isEmpty()).isTrue();
++  }
++
++  @Test
++  public void testDiffIdenticalBooleans() {
++    JsonDiffResult result =
++        JsonDiff.diff(new JsonPrimitive(true), new JsonPrimitive(true));
++    assertThat(result.isEmpty()).isTrue();
++  }
++
++  @Test
++  public void testDiffIdenticalNulls() {
++    JsonDiffResult result = JsonDiff.diff(JsonNull.INSTANCE, JsonNull.INSTANCE);
++    assertThat(result.isEmpty()).isTrue();
++  }
++
++  @Test
++  public void testDiffIdenticalObjects() {
++    JsonObject a = new JsonObject();
++    a.addProperty("name", "Alice");
++    a.addProperty("age", 30);
++    JsonObject b = new JsonObject();
++    b.addProperty("name", "Alice");
++    b.addProperty("age", 30);
++    assertThat(JsonDiff.diff(a, b).isEmpty()).isTrue();
++  }
++
++  @Test
++  public void testDiffIdenticalArrays() {
++    JsonArray a = new JsonArray();
++    a.add(1);
++    a.add("two");
++    a.add(false);
++    JsonArray b = new JsonArray();
++    b.add(1);
++    b.add("two");
++    b.add(false);
++    assertThat(JsonDiff.diff(a, b).isEmpty()).isTrue();
++  }
++
++  // ---- Empty objects and arrays ----
++
++  @Test
++  public void testDiffEmptyObjects() {
++    assertThat(JsonDiff.diff(new JsonObject(), new JsonObject()).isEmpty()).isTrue();
++  }
++
++  @Test
++  public void testDiffEmptyArrays() {
++    assertThat(JsonDiff.diff(new JsonArray(), new JsonArray()).isEmpty()).isTrue();
++  }
++
++  // ---- JsonObject: member addition, removal, change ----
++
++  @Test
++  public void testDiffObjectMemberAdded() {
++    JsonObject left = new JsonObject();
++    left.addProperty("a", 1);
++    JsonObject right = new JsonObject();
++    right.addProperty("a", 1);
++    right.addProperty("b", 2);
++
++    JsonDiffResult result = JsonDiff.diff(left, right);
++    assertThat(result.size()).isEqualTo(1);
++    DiffEntry entry = result.getDifferences().get(0);
++    assertThat(entry.getOperation()).isEqualTo(DiffOperation.ADD);
++    assertThat(entry.getPath()).isEqualTo("$.b");
++    assertThat(entry.getOldValue()).isNull();
++    assertThat(entry.getNewValue()).isEqualTo(new JsonPrimitive(2));
++  }
++
++  @Test
++  public void testDiffObjectMemberRemoved() {
++    JsonObject left = new JsonObject();
++    left.addProperty("a", 1);
++    left.addProperty("b", 2);
++    JsonObject right = new JsonObject();
++    right.addProperty("a", 1);
++
++    JsonDiffResult result = JsonDiff.diff(left, right);
++    assertThat(result.size()).isEqualTo(1);
++    DiffEntry entry = result.getDifferences().get(0);
++    assertThat(entry.getOperation()).isEqualTo(DiffOperation.REMOVE);
++    assertThat(entry.getPath()).isEqualTo("$.b");
++    assertThat(entry.getOldValue()).isEqualTo(new JsonPrimitive(2));
++    assertThat(entry.getNewValue()).isNull();
++  }
++
++  @Test
++  public void testDiffObjectMemberChanged() {
++    JsonObject left = new JsonObject();
++    left.addProperty("name", "Alice");
++    JsonObject right = new JsonObject();
++    right.addProperty("name", "Bob");
++
++    JsonDiffResult result = JsonDiff.diff(left, right);
++    assertThat(result.size()).isEqualTo(1);
++    DiffEntry entry = result.getDifferences().get(0);
++    assertThat(entry.getOperation()).isEqualTo(DiffOperation.CHANGE);
++    assertThat(entry.getPath()).isEqualTo("$.name");
++    assertThat(entry.getOldValue()).isEqualTo(new JsonPrimitive("Alice"));
++    assertThat(entry.getNewValue()).isEqualTo(new JsonPrimitive("Bob"));
++  }
++
++  @Test
++  public void testDiffObjectMultipleChanges() {
++    JsonObject left = new JsonObject();
++    left.addProperty("a", 1);
++    left.addProperty("b", 2);
++    JsonObject right = new JsonObject();
++    right.addProperty("a", 10);
++    right.addProperty("c", 3);
++
++    JsonDiffResult result = JsonDiff.diff(left, right);
++    assertThat(result.size()).isEqualTo(3);
++
++    List<DiffEntry> diffs = result.getDifferences();
++    assertThat(diffs.stream().filter(e -> e.getOperation() == DiffOperation.CHANGE)).hasSize(1);
++    assertThat(diffs.stream().filter(e -> e.getOperation() == DiffOperation.REMOVE)).hasSize(1);
++    assertThat(diffs.stream().filter(e -> e.getOperation() == DiffOperation.ADD)).hasSize(1);
++  }
++
++  // ---- JsonObject: order ignored ----
++
++  @Test
++  public void testDiffObjectOrderIgnored() {
++    JsonObject a = new JsonObject();
++    a.addProperty("x", 1);
++    a.addProperty("y", 2);
++    JsonObject b = new JsonObject();
++    b.addProperty("y", 2);
++    b.addProperty("x", 1);
++
++    assertThat(JsonDiff.diff(a, b).isEmpty()).isTrue();
++  }
++
++  // ---- JsonArray: index-sensitive ----
++
++  @Test
++  public void testDiffArrayOrderSensitive() {
++    JsonArray a = new JsonArray();
++    a.add(1);
++    a.add(2);
++    JsonArray b = new JsonArray();
++    b.add(2);
++    b.add(1);
++
++    JsonDiffResult result = JsonDiff.diff(a, b);
++    assertThat(result.isEmpty()).isFalse();
++    assertThat(result.size()).isEqualTo(2);
++    // Both indices have changed values
++    assertThat(
++            result.getDifferences().stream()
++                .allMatch(e -> e.getOperation() == DiffOperation.CHANGE))
++        .isTrue();
++  }
++
++  @Test
++  public void testDiffArrayElementAdded() {
++    JsonArray left = new JsonArray();
++    left.add(1);
++    JsonArray right = new JsonArray();
++    right.add(1);
++    right.add(2);
++
++    JsonDiffResult result = JsonDiff.diff(left, right);
++    assertThat(result.size()).isEqualTo(1);
++    DiffEntry entry = result.getDifferences().get(0);
++    assertThat(entry.getOperation()).isEqualTo(DiffOperation.ADD);
++    assertThat(entry.getPath()).isEqualTo("$[1]");
++    assertThat(entry.getNewValue()).isEqualTo(new JsonPrimitive(2));
++  }
++
++  @Test
++  public void testDiffArrayElementRemoved() {
++    JsonArray left = new JsonArray();
++    left.add(1);
++    left.add(2);
++    JsonArray right = new JsonArray();
++    right.add(1);
++
++    JsonDiffResult result = JsonDiff.diff(left, right);
++    assertThat(result.size()).isEqualTo(1);
++    DiffEntry entry = result.getDifferences().get(0);
++    assertThat(entry.getOperation()).isEqualTo(DiffOperation.REMOVE);
++    assertThat(entry.getPath()).isEqualTo("$[1]");
++    assertThat(entry.getOldValue()).isEqualTo(new JsonPrimitive(2));
++  }
++
++  // ---- Nested structures ----
++
++  @Test
++  public void testDiffNestedObject() {
++    JsonObject left = new JsonObject();
++    JsonObject leftInner = new JsonObject();
++    leftInner.addProperty("x", 1);
++    left.add("inner", leftInner);
++
++    JsonObject right = new JsonObject();
++    JsonObject rightInner = new JsonObject();
++    rightInner.addProperty("x", 2);
++    right.add("inner", rightInner);
++
++    JsonDiffResult result = JsonDiff.diff(left, right);
++    assertThat(result.size()).isEqualTo(1);
++    DiffEntry entry = result.getDifferences().get(0);
++    assertThat(entry.getOperation()).isEqualTo(DiffOperation.CHANGE);
++    assertThat(entry.getPath()).isEqualTo("$.inner.x");
++  }
++
++  @Test
++  public void testDiffNestedArray() {
++    JsonArray left = new JsonArray();
++    JsonArray leftInner = new JsonArray();
++    leftInner.add(1);
++    left.add(leftInner);
++
++    JsonArray right = new JsonArray();
++    JsonArray rightInner = new JsonArray();
++    rightInner.add(2);
++    right.add(rightInner);
++
++    JsonDiffResult result = JsonDiff.diff(left, right);
++    assertThat(result.size()).isEqualTo(1);
++    DiffEntry entry = result.getDifferences().get(0);
++    assertThat(entry.getOperation()).isEqualTo(DiffOperation.CHANGE);
++    assertThat(entry.getPath()).isEqualTo("$[0][0]");
++  }
++
++  @Test
++  public void testDiffMixedNestedStructure() {
++    // left: {"items": [{"name": "A", "price": 10}]}
++    JsonObject left = new JsonObject();
++    JsonArray leftItems = new JsonArray();
++    JsonObject leftItem = new JsonObject();
++    leftItem.addProperty("name", "A");
++    leftItem.addProperty("price", 10);
++    leftItems.add(leftItem);
++    left.add("items", leftItems);
++
++    // right: {"items": [{"name": "B", "price": 10, "discount": true}]}
++    JsonObject right = new JsonObject();
++    JsonArray rightItems = new JsonArray();
++    JsonObject rightItem = new JsonObject();
++    rightItem.addProperty("name", "B");
++    rightItem.addProperty("price", 10);
++    rightItem.addProperty("discount", true);
++    rightItems.add(rightItem);
++    right.add("items", rightItems);
++
++    JsonDiffResult result = JsonDiff.diff(left, right);
++    assertThat(result.size()).isEqualTo(2);
++    // $.items[0].name changed
++    // $.items[0].discount added
++    assertThat(
++            result.getDifferences().stream()
++                .anyMatch(
++                    e ->
++                        e.getPath().equals("$.items[0].name")
++                            && e.getOperation() == DiffOperation.CHANGE))
++        .isTrue();
++    assertThat(
++            result.getDifferences().stream()
++                .anyMatch(
++                    e ->
++                        e.getPath().equals("$.items[0].discount")
++                            && e.getOperation() == DiffOperation.ADD))
++        .isTrue();
++  }
++
++  // ---- JsonNull ----
++
++  @Test
++  public void testDiffNullVsJsonNull() {
++    // JsonNull.INSTANCE equals JsonNull.INSTANCE
++    assertThat(JsonDiff.diff(JsonNull.INSTANCE, JsonNull.INSTANCE).isEmpty()).isTrue();
++  }
++
++  @Test
++  public void testDiffObjectWithJsonNullValue() {
++    JsonObject left = new JsonObject();
++    left.add("a", JsonNull.INSTANCE);
++    JsonObject right = new JsonObject();
++    right.addProperty("a", "value");
++
++    JsonDiffResult result = JsonDiff.diff(left, right);
++    assertThat(result.size()).isEqualTo(1);
++    DiffEntry entry = result.getDifferences().get(0);
++    assertThat(entry.getOperation()).isEqualTo(DiffOperation.CHANGE);
++    assertThat(entry.getPath()).isEqualTo("$.a");
++    assertThat(entry.getOldValue()).isEqualTo(JsonNull.INSTANCE);
++    assertThat(entry.getNewValue()).isEqualTo(new JsonPrimitive("value"));
++  }
++
++  @Test
++  public void testDiffObjectMemberAddedAsJsonNull() {
++    JsonObject left = new JsonObject();
++    JsonObject right = new JsonObject();
++    right.add("a", JsonNull.INSTANCE);
++
++    JsonDiffResult result = JsonDiff.diff(left, right);
++    assertThat(result.size()).isEqualTo(1);
++    DiffEntry entry = result.getDifferences().get(0);
++    assertThat(entry.getOperation()).isEqualTo(DiffOperation.ADD);
++    assertThat(entry.getPath()).isEqualTo("$.a");
++    assertThat(entry.getNewValue()).isEqualTo(JsonNull.INSTANCE);
++  }
++
++  // ---- Type changes ----
++
++  @Test
++  public void testDiffTypeChangeStringVsNumber() {
++    // "1" vs 1 -> CHANGE (not equal per JsonPrimitive.equals)
++    JsonDiffResult result =
++        JsonDiff.diff(new JsonPrimitive("1"), new JsonPrimitive(1));
++    assertThat(result.size()).isEqualTo(1);
++    DiffEntry entry = result.getDifferences().get(0);
++    assertThat(entry.getOperation()).isEqualTo(DiffOperation.CHANGE);
++  }
++
++  @Test
++  public void testDiffTypeChangeObjectVsArray() {
++    JsonObject left = new JsonObject();
++    left.addProperty("key", "value");
++    JsonArray right = new JsonArray();
++    right.add("value");
++
++    JsonDiffResult result = JsonDiff.diff(left, right);
++    assertThat(result.size()).isEqualTo(1);
++    DiffEntry entry = result.getDifferences().get(0);
++    assertThat(entry.getOperation()).isEqualTo(DiffOperation.CHANGE);
++    assertThat(entry.getOldValue()).isEqualTo(left.deepCopy());
++    assertThat(entry.getNewValue()).isEqualTo(right.deepCopy());
++  }
++
++  @Test
++  public void testDiffTypeChangeNullVsPrimitive() {
++    JsonDiffResult result =
++        JsonDiff.diff(JsonNull.INSTANCE, new JsonPrimitive("value"));
++    assertThat(result.size()).isEqualTo(1);
++    DiffEntry entry = result.getDifferences().get(0);
++    assertThat(entry.getOperation()).isEqualTo(DiffOperation.CHANGE);
++  }
++
++  // ---- DiffEntry oldValue/newValue are deep copies ----
++
++  @Test
++  public void testDiffEntryValuesAreDeepCopies() {
++    JsonObject left = new JsonObject();
++    JsonArray leftArray = new JsonArray();
++    leftArray.add(1);
++    leftArray.add(new JsonObject());
++    left.add("arr", leftArray);
++
++    JsonObject right = new JsonObject();
++    JsonArray rightArray = new JsonArray();
++    rightArray.add(2);
++    rightArray.add(new JsonObject());
++    right.add("arr", rightArray);
++
++    // Also test with a CHANGE entry where type mismatch occurs
++    JsonArray leftArray2 = new JsonArray();
++    JsonObject leftObj = new JsonObject();
++    leftArray2.add(leftObj);
++    left.add("arr2", leftArray2);
++
++    JsonArray rightArray2 = new JsonArray();
++    rightArray2.add(new JsonPrimitive("str"));
++    right.add("arr2", rightArray2);
++
++    JsonDiffResult result = JsonDiff.diff(left, right);
++    // Find the entry for $.arr[0] (primitive change)
++    DiffEntry primitiveEntry = null;
++    DiffEntry objectEntry = null;
++    for (DiffEntry e : result.getDifferences()) {
++      if (e.getPath().equals("$.arr[0]")) {
++        primitiveEntry = e;
++      } else if (e.getPath().equals("$.arr2[0]")) {
++        objectEntry = e;
++      }
++    }
++    assertThat(primitiveEntry).isNotNull();
++    // The old/new values are primitives (deep copies of 1 and 2), not affected by mutations
++    assertThat(primitiveEntry.getOldValue()).isEqualTo(new JsonPrimitive(1));
++    assertThat(primitiveEntry.getNewValue()).isEqualTo(new JsonPrimitive(2));
++
++    assertThat(objectEntry).isNotNull();
++    // Mutate the original object after diff
++    leftObj.addProperty("x", 1);
++    // The diff entry values should not be affected (they are deep copies)
++    assertThat(objectEntry.getOldValue().getAsJsonObject().size()).isEqualTo(0);
++  }
++
++  // ---- DiffResult.getDifferences() is unmodifiable ----
++
++  @Test
++  public void testDiffResultDifferencesIsUnmodifiable() {
++    JsonDiffResult result =
++        JsonDiff.diff(new JsonPrimitive(1), new JsonPrimitive(2));
++    assertThrows(
++        UnsupportedOperationException.class,
++        () -> result.getDifferences().add(null));
++  }
++
++  // ---- Root level changes ----
++
++  @Test
++  public void testDiffRootPrimitiveChange() {
++    JsonDiffResult result =
++        JsonDiff.diff(new JsonPrimitive(1), new JsonPrimitive(2));
++    assertThat(result.size()).isEqualTo(1);
++    assertThat(result.getDifferences().get(0).getPath()).isEqualTo("$");
++  }
++
++  @Test
++  public void testDiffRootTypeChange() {
++    JsonDiffResult result =
++        JsonDiff.diff(new JsonPrimitive("hello"), JsonNull.INSTANCE);
++    assertThat(result.size()).isEqualTo(1);
++    assertThat(result.getDifferences().get(0).getPath()).isEqualTo("$");
++    assertThat(result.getDifferences().get(0).getOperation()).isEqualTo(DiffOperation.CHANGE);
++  }
++
++  // ---- Equals consistency: equals=true implies diff is empty ----
++
++  @Test
++  public void testDiffConsistentWithEqualsPrimitives() {
++    JsonPrimitive a = new JsonPrimitive(10);
++    JsonPrimitive b = new JsonPrimitive(10);
++    assertThat(a.equals(b)).isTrue();
++    assertThat(JsonDiff.diff(a, b).isEmpty()).isTrue();
++  }
++
++  @Test
++  public void testDiffConsistentWithEqualsObjects() {
++    JsonObject a = new JsonObject();
++    a.addProperty("1", true);
++    a.addProperty("2", false);
++    JsonObject b = new JsonObject();
++    b.addProperty("2", false);
++    b.addProperty("1", true);
++    assertThat(a.equals(b)).isTrue();
++    assertThat(JsonDiff.diff(a, b).isEmpty()).isTrue();
++  }
++
++  @Test
++  public void testDiffConsistentWithEqualsArrays() {
++    JsonArray a = new JsonArray();
++    a.add(1);
++    a.add("x");
++    JsonArray b = new JsonArray();
++    b.add(1);
++    b.add("x");
++    assertThat(a.equals(b)).isTrue();
++    assertThat(JsonDiff.diff(a, b).isEmpty()).isTrue();
++  }
++
++  // ---- DiffEntry.toString() ----
++
++  @Test
++  public void testDiffEntryToString() {
++    DiffEntry entry =
++        new DiffEntry("$.a", DiffOperation.CHANGE, new JsonPrimitive(1), new JsonPrimitive(2));
++    String str = entry.toString();
++    assertThat(str).contains("$.a");
++    assertThat(str).contains("CHANGE");
++  }
++}
+diff --git a/gson/src/test/java/com/google/gson/JsonObjectTest.java b/gson/src/test/java/com/google/gson/JsonObjectTest.java
+index a68a9c9c..f2a2f846 100644
+--- a/gson/src/test/java/com/google/gson/JsonObjectTest.java
++++ b/gson/src/test/java/com/google/gson/JsonObjectTest.java
+@@ -198,6 +198,39 @@ public class JsonObjectTest {
+     MoreAsserts.assertEqualsAndHashCode(a, b);
+   }
+ 
++  @Test
++  public void testDiffOnEqualObjects() {
++    JsonObject a = new JsonObject();
++    JsonObject b = new JsonObject();
++    a.addProperty("key", "value");
++    b.addProperty("key", "value");
++    MoreAsserts.assertNoDifferences(a, b);
++  }
++
++  @Test
++  public void testDiffIgnoringOrder() {
++    JsonObject a = new JsonObject();
++    JsonObject b = new JsonObject();
++    a.addProperty("1", true);
++    a.addProperty("2", false);
++    b.addProperty("2", false);
++    b.addProperty("1", true);
++    MoreAsserts.assertNoDifferences(a, b);
++  }
++
++  @Test
++  public void testDiffOnDifferentObjects() {
++    JsonObject a = new JsonObject();
++    a.add("foo", new JsonObject());
++    JsonObject b = new JsonObject();
++
++    JsonDiffResult result = JsonDiff.diff(a, b);
++    assertThat(result.isEmpty()).isFalse();
++    assertThat(result.getDifferences()).hasSize(1);
++    assertThat(result.getDifferences().get(0).getOperation()).isEqualTo(DiffOperation.REMOVE);
++    assertThat(result.getDifferences().get(0).getPath()).isEqualTo("$.foo");
++  }
++
+   @Test
+   public void testSize() {
+     JsonObject o = new JsonObject();
+diff --git a/gson/src/test/java/com/google/gson/common/MoreAsserts.java b/gson/src/test/java/com/google/gson/common/MoreAsserts.java
+index 3b74056d..a660f275 100644
+--- a/gson/src/test/java/com/google/gson/common/MoreAsserts.java
++++ b/gson/src/test/java/com/google/gson/common/MoreAsserts.java
+@@ -16,6 +16,9 @@
+ 
+ package com.google.gson.common;
+ 
++import com.google.gson.JsonDiff;
++import com.google.gson.JsonDiffResult;
++import com.google.gson.JsonElement;
+ import java.lang.reflect.Method;
+ import java.lang.reflect.Modifier;
+ import java.util.Collection;
+@@ -55,6 +58,21 @@ public class MoreAsserts {
+     Assert.assertFalse(a.equals(new Object()));
+   }
+ 
++  /**
++   * Asserts that two {@link JsonElement} values have no differences, i.e., {@link
++   * JsonDiff#diff(JsonElement, JsonElement)} returns an empty result. This validates that diff
++   * semantics are consistent with {@link JsonElement#equals(Object)}.
++   */
++  public static void assertNoDifferences(JsonElement a, JsonElement b) {
++    JsonDiffResult result = JsonDiff.diff(a, b);
++    Assert.assertTrue(
++        "Expected no differences, but found "
++            + result.size()
++            + ": "
++            + result.getDifferences(),
++        result.isEmpty());
++  }
++
+   private static boolean isProtectedOrPublic(Method method) {
+     int modifiers = method.getModifiers();
+     return Modifier.isProtected(modifiers) || Modifier.isPublic(modifiers);

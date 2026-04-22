@@ -1,0 +1,7 @@
+*.diff text eol=lf
+*.sh text eol=lf
+*.py text eol=lf
+*.java text
+*.xml text
+*.md text
+*.yml text
